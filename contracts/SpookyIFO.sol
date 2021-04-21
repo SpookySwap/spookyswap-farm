@@ -5,25 +5,15 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
-import "./SpookyToken.sol"; 
+import "./SpookyToken.sol";
 
-// The Spooky Garden is a fork of MasterChef by SushiSwap
-// The biggest change made is using per second instead of per block for rewards
-// This is due to Fantoms extremely inconsistent block times
-// The other biggest change was the removal of the migration functions
-//
-// Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once BOO is sufficiently
-// distributed and the community can show to govern itself.
-//
-// Have fun reading it. Hopefully it's bug-free. 
-contract MasterChef is Ownable {
+contract SpookyIFO is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     // Info of each user.
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided.
+        uint256 amount;     // How many tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, any point in time, the amount of BOOs
@@ -31,7 +21,7 @@ contract MasterChef is Ownable {
         //
         //   pending reward = (user.amount * pool.accBOOPerShare) - user.rewardDebt
         //
-        // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
+        // Whenever a user deposits or withdraws tokens to a pool. Here's what happens:
         //   1. The pool's `accBOOPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
@@ -40,7 +30,7 @@ contract MasterChef is Ownable {
 
     // Info of each pool.
     struct PoolInfo {
-        IERC20 lpToken;           // Address of LP token contract.
+        IERC20 Token;           // Address of token contract.
         uint256 allocPoint;       // How many allocation points assigned to this pool. BOOs to distribute per block.
         uint256 lastRewardTime;  // Last block time that BOOs distribution occurs.
         uint256 accBOOPerShare; // Accumulated BOOs per share, times 1e12. See below.
@@ -49,24 +39,19 @@ contract MasterChef is Ownable {
     // such a spooky token!
     SpookyToken public boo;
 
-    // Dev address.
-    address public devaddr;
     // boo tokens created per block.
     uint256 private booPerSecond;
 
-    // set a max boo per second, which is also the initial boos per second
-    uint256 private constant maxBooPerSecond = 27391208592348200; // .273 boos per second
-
-    uint256 private constant MaxAllocPoint = 4000;
-
     // Info of each pool.
     PoolInfo[] public poolInfo;
-    // Info of each user that stakes LP tokens.
+    // Info of each user that stakes tokens.
     mapping (uint256 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block time when boo mining starts.
     uint256 public immutable startTime;
+
+    uint256 public endTime;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -74,24 +59,26 @@ contract MasterChef is Ownable {
 
     constructor(
         SpookyToken _boo,
-        address _devaddr,
         uint256 _booPerSecond,
-        uint256 _startTime
+        uint256 _startTime,
+        uint256 _endTime
     ) {
         boo = _boo;
-        devaddr = _devaddr;
         booPerSecond = _booPerSecond;
         startTime = _startTime;
+        endTime = _startTime + 6 weeks;
+    }
+
+    function changeEndTime(uint32 addSeconds) external onlyOwner {
+        endTime += addSeconds;
     }
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
     }
 
-    // Changes boo token reward per second, with a cap of maxboo per second
     // Good practice to update pools without messing up the contract
     function setBooPerSecond(uint256 _booPerSecond) external onlyOwner {
-        require(_booPerSecond <= maxBooPerSecond, "setBooPerSecond: too many boos!");
 
         // This MUST be done or pool rewards will be calculated with new boo per second
         // This could unfairly punish small pools that dont have frequent deposits/withdraws/harvests
@@ -100,35 +87,32 @@ contract MasterChef is Ownable {
         booPerSecond = _booPerSecond;
     }
 
-    function checkForDuplicate(IERC20 _lpToken) internal view {
+    function checkForDuplicate(IERC20 _Token) internal view {
         uint256 length = poolInfo.length;
         for (uint256 _pid = 0; _pid < length; _pid++) {
-            require(poolInfo[_pid].lpToken != _lpToken, "add: pool already exists!!!!");
+            require(poolInfo[_pid].Token != _Token, "add: pool already exists!!!!");
         }
-
     }
 
-    // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IERC20 _lpToken) external onlyOwner {
-        require(_allocPoint <= MaxAllocPoint, "add: too many alloc points!!");
+    // Add a new token to the pool. Can only be called by the owner.
+    function add(uint256 _allocPoint, IERC20 _Token) external onlyOwner {
 
-        checkForDuplicate(_lpToken); // ensure you cant add duplicate pools
+        checkForDuplicate(_Token); // ensure you cant add duplicate pools
 
         massUpdatePools();
 
         uint256 lastRewardTime = block.timestamp > startTime ? block.timestamp : startTime;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
-            lpToken: _lpToken,
+            Token: _Token,
             allocPoint: _allocPoint,
             lastRewardTime: lastRewardTime,
             accBOOPerShare: 0
         }));
     }
 
-    // Update the given pool's BOO allocation point. Can only be called by the owner.
+    // Update the given pool's boo allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint) external onlyOwner {
-        require(_allocPoint <= MaxAllocPoint, "add: too many alloc points!!");
 
         massUpdatePools();
 
@@ -139,8 +123,11 @@ contract MasterChef is Ownable {
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
         _from = _from > startTime ? _from : startTime;
-        if (_to < startTime) {
+        if (_from > endTime || _to < startTime) {
             return 0;
+        }
+        if (_to > endTime) {
+            return endTime - _from;
         }
         return _to - _from;
     }
@@ -150,11 +137,11 @@ contract MasterChef is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accBOOPerShare = pool.accBOOPerShare;
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (block.timestamp > pool.lastRewardTime && lpSupply != 0) {
+        uint256 Supply = pool.Token.balanceOf(address(this));
+        if (block.timestamp > pool.lastRewardTime && Supply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
             uint256 booReward = multiplier.mul(booPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
-            accBOOPerShare = accBOOPerShare.add(booReward.mul(1e12).div(lpSupply));
+            accBOOPerShare = accBOOPerShare.add(booReward.mul(1e12).div(Supply));
         }
         return user.amount.mul(accBOOPerShare).div(1e12).sub(user.rewardDebt);
     }
@@ -173,22 +160,19 @@ contract MasterChef is Ownable {
         if (block.timestamp <= pool.lastRewardTime) {
             return;
         }
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (lpSupply == 0) {
+        uint256 Supply = pool.Token.balanceOf(address(this));
+        if (Supply == 0) {
             pool.lastRewardTime = block.timestamp;
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
         uint256 booReward = multiplier.mul(booPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
 
-        boo.mint(devaddr, booReward.div(10));
-        boo.mint(address(this), booReward);
-
-        pool.accBOOPerShare = pool.accBOOPerShare.add(booReward.mul(1e12).div(lpSupply));
+        pool.accBOOPerShare = pool.accBOOPerShare.add(booReward.mul(1e12).div(Supply));
         pool.lastRewardTime = block.timestamp;
     }
 
-    // Deposit LP tokens to MasterChef for BOO allocation.
+    // Deposit tokens to IFO for boo allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -204,12 +188,12 @@ contract MasterChef is Ownable {
         if(pending > 0) {
             safeBOOTransfer(msg.sender, pending);
         }
-        pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+        pool.Token.safeTransferFrom(address(msg.sender), address(this), _amount);
 
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    // Withdraw LP tokens from MasterChef.
+    // Withdraw tokens.
     function withdraw(uint256 _pid, uint256 _amount) public {  
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -226,7 +210,7 @@ contract MasterChef is Ownable {
         if(pending > 0) {
             safeBOOTransfer(msg.sender, pending);
         }
-        pool.lpToken.safeTransfer(address(msg.sender), _amount);
+        pool.Token.safeTransfer(address(msg.sender), _amount);
         
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -240,7 +224,7 @@ contract MasterChef is Ownable {
         user.amount = 0;
         user.rewardDebt = 0;
 
-        pool.lpToken.safeTransfer(address(msg.sender), oldUserAmount);
+        pool.Token.safeTransfer(address(msg.sender), oldUserAmount);
         emit EmergencyWithdraw(msg.sender, _pid, oldUserAmount);
 
     }
@@ -253,11 +237,5 @@ contract MasterChef is Ownable {
         } else {
             boo.transfer(_to, _amount);
         }
-    }
-
-    // Update dev address by the previous dev.
-    function dev(address _devaddr) public {
-        require(msg.sender == devaddr, "dev: wut?");
-        devaddr = _devaddr;
     }
 }

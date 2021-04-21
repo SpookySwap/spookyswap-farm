@@ -11,22 +11,22 @@ import "./SpookyToken.sol"; // should be spooktoken later
 contract SpookyTimelock {
     using SafeERC20 for IERC20;
 
-    IERC20 public spook;
-    IERC20 public spookLP;
+    IERC20 public boo;
+    IERC20 public booLP;
 
     TokenTimelock[] public Locks;
 
-    constructor (IERC20 _spook, IERC20 _spookLP) {
+    constructor (IERC20 _boo, IERC20 _booLP) {
 
-        spook = _spook;
-        spookLP = _spookLP;
+        boo = _boo;
+        booLP = _booLP;
         uint currentTime = block.timestamp;
 
-        createLock(_spook, msg.sender, currentTime + 60 days);
-        createLock(_spook, msg.sender, currentTime + 120 days);
-        createLock(_spook, msg.sender, currentTime + 180 days);
-        createLock(_spook, msg.sender, currentTime + 240 days);
-        createLock(_spookLP, msg.sender, currentTime + 365 days);
+        createLock(_boo, msg.sender, currentTime + 60 days);
+        createLock(_boo, msg.sender, currentTime + 120 days);
+        createLock(_boo, msg.sender, currentTime + 180 days);
+        createLock(_boo, msg.sender, currentTime + 240 days);
+        createLock(_booLP, msg.sender, currentTime + 365 days);
     }
 
     function createLock(IERC20 token, address sender, uint256 time) internal {
@@ -51,24 +51,24 @@ contract SpookyTimelock {
     //Forward along tokens to their appropriate vesting place
     function forwardTokens() external {
 
-        uint spooks = spook.balanceOf(address(this));
-        uint spookLPs = spookLP.balanceOf(address(this));
+        uint boos = boo.balanceOf(address(this));
+        uint booLPs = booLP.balanceOf(address(this));
 
-        require(spooks > 0, "forwardTokens: no spooks!");
-        require(spookLPs > 0, "forwardTokens: no spooky lps!");
+        require(boos > 0, "forwardTokens: no boos!");
+        require(booLPs > 0, "forwardTokens: no spooky lps!");
 
         for (uint256 index = 0; index <= 3; index++) {
-            spook.transfer(address(Locks[index]), spooks / 4);
+            boo.transfer(address(Locks[index]), boos / 4);
         }
 
-        // just incase theres any spooks left from rounding
-        uint leftover = spook.balanceOf(address(this));
+        // just incase theres any boos left from rounding
+        uint leftover = boo.balanceOf(address(this));
 
         if (leftover > 0) {
-            spook.transfer(address(Locks[3]), leftover);
+            boo.transfer(address(Locks[3]), leftover);
         }
 
-        spookLP.safeTransfer(address(Locks[4]), spookLPs);
+        booLP.safeTransfer(address(Locks[4]), booLPs);
     }
 
 

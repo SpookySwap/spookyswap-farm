@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SpookyToken is ERC20Permit, Ownable {
 
-    constructor() ERC20("SpookyToken", "SPOOK") ERC20Permit("SpookyToken")
+    constructor() ERC20("SpookyToken", "BOO") ERC20Permit("SpookyToken")
     {
 
     }
