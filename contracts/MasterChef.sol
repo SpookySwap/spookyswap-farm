@@ -52,12 +52,12 @@ contract MasterChef is Ownable {
     // Dev address.
     address public devaddr;
     // boo tokens created per block.
-    uint256 private booPerSecond;
+    uint256 public booPerSecond;
 
-    // set a max boo per second, which is also the initial boos per second
-    uint256 private constant maxBooPerSecond = 27391208592348200; // .273 boos per second
+    // set a max boo per second, which can never be higher than 1 per second
+    uint256 public constant maxBooPerSecond = 1e18;
 
-    uint256 private constant MaxAllocPoint = 4000;
+    uint256 public constant MaxAllocPoint = 4000;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;

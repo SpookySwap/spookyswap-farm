@@ -31,6 +31,7 @@ contract SpookyIFO is Ownable {
     // Info of each pool.
     struct PoolInfo {
         IERC20 Token;           // Address of token contract.
+        uint256 stakingTokenTotalAmount;
         uint256 allocPoint;       // How many allocation points assigned to this pool. BOOs to distribute per block.
         uint256 lastRewardTime;  // Last block time that BOOs distribution occurs.
         uint256 accBOOPerShare; // Accumulated BOOs per share, times 1e12. See below.
@@ -40,7 +41,7 @@ contract SpookyIFO is Ownable {
     SpookyToken public boo;
 
     // boo tokens created per block.
-    uint256 private booPerSecond;
+    uint256 public booPerSecond;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -60,13 +61,12 @@ contract SpookyIFO is Ownable {
     constructor(
         SpookyToken _boo,
         uint256 _booPerSecond,
-        uint256 _startTime,
-        uint256 _endTime
+        uint256 _startTime
     ) {
         boo = _boo;
         booPerSecond = _booPerSecond;
         startTime = _startTime;
-        endTime = _startTime + 6 weeks;
+        endTime = _startTime + 13 weeks;
     }
 
     function changeEndTime(uint32 addSeconds) external onlyOwner {
@@ -106,6 +106,7 @@ contract SpookyIFO is Ownable {
         poolInfo.push(PoolInfo({
             Token: _Token,
             allocPoint: _allocPoint,
+            stakingTokenTotalAmount: 0,
             lastRewardTime: lastRewardTime,
             accBOOPerShare: 0
         }));
@@ -137,11 +138,11 @@ contract SpookyIFO is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accBOOPerShare = pool.accBOOPerShare;
-        uint256 Supply = pool.Token.balanceOf(address(this));
-        if (block.timestamp > pool.lastRewardTime && Supply != 0) {
+
+        if (block.timestamp > pool.lastRewardTime && pool.stakingTokenTotalAmount != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
             uint256 booReward = multiplier.mul(booPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
-            accBOOPerShare = accBOOPerShare.add(booReward.mul(1e12).div(Supply));
+            accBOOPerShare = accBOOPerShare.add(booReward.mul(1e12).div(pool.stakingTokenTotalAmount));
         }
         return user.amount.mul(accBOOPerShare).div(1e12).sub(user.rewardDebt);
     }
@@ -160,15 +161,15 @@ contract SpookyIFO is Ownable {
         if (block.timestamp <= pool.lastRewardTime) {
             return;
         }
-        uint256 Supply = pool.Token.balanceOf(address(this));
-        if (Supply == 0) {
+
+        if (pool.stakingTokenTotalAmount == 0) {
             pool.lastRewardTime = block.timestamp;
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
         uint256 booReward = multiplier.mul(booPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
 
-        pool.accBOOPerShare = pool.accBOOPerShare.add(booReward.mul(1e12).div(Supply));
+        pool.accBOOPerShare = pool.accBOOPerShare.add(booReward.mul(1e12).div(pool.stakingTokenTotalAmount));
         pool.lastRewardTime = block.timestamp;
     }
 
@@ -183,6 +184,7 @@ contract SpookyIFO is Ownable {
         uint256 pending = user.amount.mul(pool.accBOOPerShare).div(1e12).sub(user.rewardDebt);
 
         user.amount = user.amount.add(_amount);
+        pool.stakingTokenTotalAmount += _amount;
         user.rewardDebt = user.amount.mul(pool.accBOOPerShare).div(1e12);
 
         if(pending > 0) {
@@ -205,6 +207,7 @@ contract SpookyIFO is Ownable {
         uint256 pending = user.amount.mul(pool.accBOOPerShare).div(1e12).sub(user.rewardDebt);
 
         user.amount = user.amount.sub(_amount);
+        pool.stakingTokenTotalAmount -= _amount;
         user.rewardDebt = user.amount.mul(pool.accBOOPerShare).div(1e12);
 
         if(pending > 0) {
@@ -221,6 +224,7 @@ contract SpookyIFO is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         uint oldUserAmount = user.amount;
+        pool.stakingTokenTotalAmount -= user.amount;
         user.amount = 0;
         user.rewardDebt = 0;
 
