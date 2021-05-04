@@ -11,7 +11,7 @@ contract SpookyToken is ERC20Permit, Ownable {
 
     }
 
-    uint256 constant private _maxTotalSupply = 13666000e18; // 13,666,000 max spooks
+    uint256 constant private _maxTotalSupply = 13666000e18; // 13,666,000 max boos
 
     function mint(address _to, uint256 _amount) public onlyOwner {
         require(totalSupply() + _amount <= _maxTotalSupply, "ERC20: minting more then MaxTotalSupply");
@@ -137,9 +137,9 @@ contract SpookyToken is ERC20Permit, Ownable {
         );
 
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "SPOOK::delegateBySig: invalid signature");
-        require(nonce == _useNonce(signatory), "SPOOK::delegateBySig: invalid nonce");
-        require(block.timestamp <= expiry, "SPOOK::delegateBySig: signature expired");
+        require(signatory != address(0), "BOO::delegateBySig: invalid signature");
+        require(nonce == _useNonce(signatory), "BOO::delegateBySig: invalid nonce");
+        require(block.timestamp <= expiry, "BOO::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -169,7 +169,7 @@ contract SpookyToken is ERC20Permit, Ownable {
         view
         returns (uint256)
     {
-        require(blockNumber < block.number, "SPOOK::getPriorVotes: not yet determined");
+        require(blockNumber < block.number, "BOO::getPriorVotes: not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
@@ -206,7 +206,7 @@ contract SpookyToken is ERC20Permit, Ownable {
         internal
     {
         address currentDelegate = _delegates[delegator];
-        uint256 delegatorBalance = balanceOf(delegator); // balance of underlying SPOOKs (not scaled);
+        uint256 delegatorBalance = balanceOf(delegator); // balance of underlying BOOs (not scaled);
         _delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);
@@ -242,7 +242,7 @@ contract SpookyToken is ERC20Permit, Ownable {
     )
         internal
     {
-        uint32 blockNumber = safe32(block.number, "SPOOK::_writeCheckpoint: block number exceeds 32 bits");
+        uint32 blockNumber = safe32(block.number, "BOO::_writeCheckpoint: block number exceeds 32 bits");
 
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
